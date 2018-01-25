@@ -17,7 +17,7 @@ hkvwaporpy depends on the following packages:
 If you have trouble installing these on Windows, you should try downloading these from https://www.lfd.uci.edu/~gohlke/pythonlibs (and use `pip install path/to/package.whl` to install the package).
 
 # usage package
-Import the package and define path to his-file
+Import the package
 
     import hkvwaporpy as hkv    
     
