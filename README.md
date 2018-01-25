@@ -77,7 +77,7 @@ Coverage request for single product.
       Overviews: 2703x2265, 1352x1133, 676x567, 338x284, 169x142    
 
 # Notebook
-A Jupyter Notebook is available in the `notebook` folder with a detailed example how to retrieve the url and parse and read this raster from memory buffer using GDAL.
+A Jupyter Notebook is available in the `notebook` folder with a detailed [example](../master/notebook/hkvwaporpy%20example.ipynb "hkvwapor example.ipynb") how to retrieve the url and parse and read this raster from memory buffer using GDAL.
 
 # Contact
 We at HKV provide expert advice and research in the field of water and safety. Using `hkvwapory` we access the WaPOR dataset to code custom-build operational apps and dashboards for river, coasts and deltas providing early-warnings and forecasts for risk and disaster management.
