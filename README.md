@@ -81,6 +81,6 @@ A Jupyter Notebook is available in the `notebook` folder with a detailed example
 
 # Contact
 We at HKV provide expert advice and research in the field of water and safety. Using `hkvwapory` we access the WaPOR dataset to code custom-build operational apps and dashboards for river, coasts and deltas providing early-warnings and forecasts for risk and disaster management.
-Interested? Head to https://www.hkv.nl/en/
 
+Interested? Head to https://www.hkv.nl/en/ or drop me a line at m.vanhoek [at] hkv.nl
     
