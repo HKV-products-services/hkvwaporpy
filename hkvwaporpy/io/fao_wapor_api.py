@@ -10,14 +10,16 @@ class __fao_wapor_class(object):
     def __init__(self):
         # old:
         # self._fao_sdi_data_discovery = 'https://api.fao.org/api/sdi/data/discovery/en/workspaces/WAPOR/cubes'
+        # 'http://www.fao.org/wapor-download/WAPOR/coverages/mosaic'        
+        
         # new:
         self._fao_sdi_data_discovery = 'https://io.apps.fao.org/gismgr/api/v1/catalog/workspaces/WAPOR/cubes'
-        
         self._fao_sdi_data_query = 'https://io.apps.fao.org/gismgr/api/v1/query'#'https://api.fao.org/api/sdi/data/query'
-        self._fao_wapor_download = 'https://io.apps.fao.org/gismgr/api/v1/download/WAPOR?language=en&requestType=mapset_raster&'
-        #'https://io.apps.fao.org/gismgr/download/c3/92/79/10-cf8b-41a4-8198-767447378d98/L2_AETI_0901_7010.tif'
-        #'http://www.fao.org/wapor-download/WAPOR/coverages/mosaic'
-        self._catalogus = self._query_catalogus()
+        self._fao_wapor_download = 'https://io.apps.fao.org/gismgr/api/v1/download/WAPOR'
+        self._fao_wapor_identitytoolkit_url = 'https://www.googleapis.com/identitytoolkit/v3/relyingparty'
+        self._fao_wapor_identitytoolkit_key = 'AIzaSyAgnCXnRLfniGG6iMqv8PFSpop41YoOrr4'
+        self._fao_wapor_token = ''
+        
     
     def _query_catalogus(self, overview=False):
         """
@@ -37,7 +39,7 @@ class __fao_wapor_class(object):
         """
         # create url
         meta_data_url = '{0}?overview={1}'.format(self._fao_sdi_data_discovery, overview)
-        print(meta_data_url)
+        #print(meta_data_url)
 
         # get request
         resp = requests.get(meta_data_url)
@@ -48,7 +50,8 @@ class __fao_wapor_class(object):
         self._catalogus = df
         return df            
     
-    def get_catalogus(self, **kwargs):
+    def get_catalogus(self):
+        self._catalogus = self._query_catalogus()
         return self._catalogus
     
     def get_info_cube(self, cube_code='L2_AETI_D'):
@@ -650,12 +653,117 @@ class __fao_wapor_class(object):
 
         return df  
     
-    def get_coverage_url(self, raster_id, cube_code, loc_type, loc_code):
+    def _query_token(self, email, password):
         """
-        function to retrieve a coverage URL given dataset, date and location
-
+        function to get user specific Bearer token.
+        make sure you are a registered user at WaPOR (https://wapor.apps.fao.org/sign-in)
+        
         Parameters
         ----------
+        user_email : str
+            registered email address
+        user_password : str
+            valid password
+        """
+        
+        key = self._fao_wapor_identitytoolkit_key
+        base_url = self._fao_wapor_identitytoolkit_url
+        verify_password = '{}/verifyPassword'.format(base_url)
+        
+        # post request to the google identitytoolkit
+        resp_vp = requests.post(verify_password, data={'key': key, 
+                                                       'email': email, 
+                                                       'password': password, 
+                                                       'returnSecureToken': 'true'
+                                                      })
+        # parse results
+        resp_vp = resp_vp.json()
+        token = resp_vp['idToken']
+        display_name = resp_vp['displayName']
+        expires_in = int(resp_vp['expiresIn']) # seconds
+        self._fao_wapor_token = token
+        self._fao_wapor_expires_in = expires_in
+        
+        #identity = {'token': token, 'display_name': display_name, 'expires_in':expires_in}
+        
+        #return identity
+    
+    def _query_account_info(self):
+        """
+        function to get user specific Bearer token.
+        make sure you are a registered user at WaPOR (https://wapor.apps.fao.org/sign-in)
+        
+        Parameters
+        ----------
+        user_email : str
+            registered email address
+        user_password : str
+            valid password
+
+        Returns
+        -------
+        log_in_date : datetime
+            last login date as datetime object
+        """
+        
+        key = self._fao_wapor_identitytoolkit_key
+        base_url = self._fao_wapor_identitytoolkit_url
+        get_account_info = '{}/getAccountInfo'.format(base_url)        
+        
+        token = self._fao_wapor_token
+        # post request to the google identitytoolkit
+        resp_ai = requests.post(get_account_info, data={'key': key, 
+                                                        'idToken': token
+                                                       })       
+        
+        # parse results
+        resp_ai = resp_ai.json()
+        last_login_at = int(resp_ai['users'][0]['lastLoginAt'])
+        self._fao_wapor_last_login_date = datetime.datetime.fromtimestamp(last_login_at/1000)
+    
+    
+    def _quary_valid_token(self, email, password):
+        """
+        function to check if current token is still valid
+        
+        Parameters
+        ----------
+        
+        """
+        
+        if not len(self._fao_wapor_token):
+            # get token
+            self._query_token(email, password)
+            self._query_account_info()
+            
+        # expiry time is the last login date + the expiry time in seconds from identity toolkit  
+        expiry_date = self._fao_wapor_last_login_date + datetime.timedelta(seconds=self._fao_wapor_expires_in)
+        
+        # if false, token is expired
+        if expiry_date > datetime.datetime.now() == False:
+            # request new token
+            self._query_token(email,password)
+            self._query_account_info()            
+            
+            expiry_date = self._fao_wapor_last_login_date + datetime.timedelta(seconds=self._fao_wapor_expires_in)
+            # if expiry date is still false, something else wrong and return error
+            if expiry_date > datetime.datetime.now() == False:
+                raise ValueError('could not get valid token')
+                
+        return self._fao_wapor_token
+    
+        
+    def get_coverage_url(self, email, password, raster_id, cube_code, loc_type, loc_code):
+        """
+        function to retrieve a coverage URL given dataset, date, location, email and password
+        make sure you are a registered user at WaPOR (https://wapor.apps.fao.org/sign-in)
+        
+        Parameters
+        ----------
+        user_email : str
+            registered email address
+        user_password : str
+            valid password        
         raster_id : str
             id corresponding to a period for which an observation of the product is stored
         cube_code : str
@@ -664,12 +772,11 @@ class __fao_wapor_class(object):
             choose from 'BASIN' or 'COUNTRY'
         loc_code : str
             code corresponding to location (get from read_wapor.get_locations())
-        workspace_code : str
-            default 'WAPOR'
+
         Returns
         -------
-        url_coverage : str
-            coverage url, with which the download URL can be requested (authorized access only)
+        coverage_object : dict
+            dictionary containing the download URL and expiry time in seconds from request time
 
         """
         # split cube_code
@@ -684,10 +791,14 @@ class __fao_wapor_class(object):
             loc_type = 'BAS'
         if loc_type == 'COUNTRY':
             loc_type = 'CTY'  
-
-        # create url for L2 products
+        
+        # generic params for raster data
+        language = 'en'
+        requestType = 'mapset_raster'
+            
+        # get cube_code and raster_id for L2 products
         if cube_level == 'L2':
-            url_coverage = '{0}cubeCode={1}_{2}_{3}&rasterId={4}_{5}_{6}'.format(
+            cubeCode = '{1}_{2}_{3}_{4}'.format(
                 self._fao_wapor_download, 
                 cube_level, 
                 cube_product, 
@@ -696,10 +807,19 @@ class __fao_wapor_class(object):
                 raster_id,
                 loc_code
             )
-
-        # create url for L1 products
+            rasterId = '{5}_{6}'.format(
+                self._fao_wapor_download, 
+                cube_level, 
+                cube_product, 
+                loc_type, 
+                cube_dimension,
+                raster_id,
+                loc_code
+            )
+            
+        # get cube_code and raster_id for L1 products
         if cube_level == 'L1':
-            url_coverage = '{0}cubeCode={1}_{2}_{3}&rasterId={4}_{5}'.format(
+            cubeCode= '{1}_{2}_{3}'.format(
                 self._fao_wapor_download, 
                 cube_level, 
                 cube_product, 
@@ -707,5 +827,26 @@ class __fao_wapor_class(object):
                 raster_id,
                 loc_code
             )    
-            
-        return url_coverage    
+            rasterId='{4}_{5}'.format(
+                self._fao_wapor_download, 
+                cube_level, 
+                cube_product, 
+                cube_dimension,
+                raster_id,
+                loc_code
+            )    
+        
+        # get new token or reuse if still valid
+        token = self._quary_valid_token(email, password)
+        
+        params = {'language':language, 'requestType':requestType, 'cubeCode':cubeCode, 'rasterId':rasterId}
+        headers = {'Authorization': "Bearer " + token}
+        cov_base_url = self._fao_wapor_download
+        r = requests.get(cov_base_url, params=params, headers=headers)
+        resp = r.json()['response']
+        
+        
+        expiry_date = datetime.datetime.now() + datetime.timedelta(seconds=int(resp['expiresIn']))
+        coverage_object = {'expiry_datetime': expiry_date, 'download_url': resp['downloadUrl']}
+        
+        return coverage_object
