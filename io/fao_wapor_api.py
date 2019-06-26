@@ -19,9 +19,10 @@ class __fao_wapor_class(object):
         self._fao_wapor_identitytoolkit_url = 'https://www.googleapis.com/identitytoolkit/v3/relyingparty'
         self._fao_wapor_identitytoolkit_key = 'AIzaSyAgnCXnRLfniGG6iMqv8PFSpop41YoOrr4'
         self._fao_wapor_token = ''
+        self.sign_in_url='https://io.apps.fao.org/gismgr/api/v1/iam/sign-in'
         
     
-    def _query_catalogus(self, overview=False):
+    def _query_catalogus(self, overview=False,paged=False):
         """
         Retrieve catalogus of all available datasets on WaPOR
 
@@ -38,14 +39,16 @@ class __fao_wapor_class(object):
             dataframe containing the catalogus
         """
         # create url
-        meta_data_url = '{0}?overview={1}'.format(self._fao_sdi_data_discovery, overview)
+#        meta_data_url = '{0}?overview={1}'.format(self._fao_sdi_data_discovery, overview)
+        meta_data_url = '{0}?overview={1}&paged={2}'.format(self._fao_sdi_data_discovery, overview,paged)
         #print(meta_data_url)
 
         # get request
         resp = requests.get(meta_data_url)
 
         # parse to dataframe
-        meta_data_items = resp.json()['response']['items']
+#        meta_data_items = resp.json()['response']['items']
+        meta_data_items = resp.json()['response']
         df = pd.DataFrame.from_dict(meta_data_items, orient='columns')
         self._catalogus = df
         return df            
@@ -560,7 +563,18 @@ class __fao_wapor_class(object):
         resp : json
             json object describing the locations
         """        
-
+#        query_location_list = {
+#              "type": "TableQuery_GetList_1",
+#              "params": {
+#                "properties": {
+#                  "paged": False
+#                },
+#                "table": {
+#                  "workspaceCode": "WAPOR",
+#                  "code": "LOCATION"
+#                }
+#              }
+#            }
         query_location_list = {
            "type":"TableQuery_GetList_1",
            "params":{  
@@ -578,12 +592,12 @@ class __fao_wapor_class(object):
                        filter_value
                     ]
                  },
-                 {  
-                    "columnName":"l2",
-                    "values":[  
-                       True
-                    ]
-                 }
+#                 {  
+#                    "columnName":"l2",
+#                    "values":[  
+#                       True
+#                    ]
+#                 }
               ],
               "sort":[  
                  {  
@@ -621,7 +635,10 @@ class __fao_wapor_class(object):
         loc_name = []
         loc_code = []
         loc_type = []
-        loc_bbox = []    
+        loc_bbox = [] 
+        loc_l1=[]
+        loc_l2=[]
+        loc_l3=[]
 
         # get info of all locations
         if filter_value == None:
@@ -632,6 +649,9 @@ class __fao_wapor_class(object):
                     loc_code.append(loc['code'])
                     loc_type.append(loc['type'])
                     loc_bbox.append(list(map(float, loc['bbox'].split(','))))
+                    loc_l1.append(loc['l1'])
+                    loc_l2.append(loc['l2'])
+                    loc_l3.append(loc['l3'])
 
         # if filter value is BASIN or COUNTRY
         elif filter_value in ['BASIN', 'COUNTRY']:
@@ -641,6 +661,9 @@ class __fao_wapor_class(object):
                 loc_code.append(loc['code'])
                 loc_type.append(loc['type'])
                 loc_bbox.append(list(map(float, loc['bbox'].split(','))))
+                loc_l1.append(loc['l1'])
+                loc_l2.append(loc['l2'])
+                loc_l3.append(loc['l3'])
 
         # error
         else:
@@ -648,8 +671,8 @@ class __fao_wapor_class(object):
             return
 
         # parse lists to dataframe
-        df = pd.DataFrame(list(zip(loc_name, loc_code, loc_type, loc_bbox)),
-                          columns=['name', 'code', 'type', 'bbox'])    
+        df = pd.DataFrame(list(zip(loc_name, loc_code, loc_type, loc_bbox,loc_l1,loc_l2,loc_l3)),
+                          columns=['name', 'code', 'type', 'bbox','L1','L2','L3'])    
 
         return df  
     
@@ -722,38 +745,48 @@ class __fao_wapor_class(object):
         self._fao_wapor_last_login_date = datetime.datetime.fromtimestamp(last_login_at/1000)
     
     
-    def _quary_valid_token(self, email, password):
+    def _quary_valid_token(self, APItoken): #email, password):
         """
-        function to check if current token is still valid
-        
-        Parameters
-        ----------
-        
+        function to get accessToken using APItoken generated from WaPOR portal
         """
-        
-        if not len(self._fao_wapor_token):
-            # get token
-            self._query_token(email, password)
-            self._query_account_info()
-            
-        # expiry time is the last login date + the expiry time in seconds from identity toolkit  
-        expiry_date = self._fao_wapor_last_login_date + datetime.timedelta(seconds=self._fao_wapor_expires_in)
-        
-        # if false, token is expired
-        if expiry_date > datetime.datetime.now() == False:
-            # request new token
-            self._query_token(email,password)
-            self._query_account_info()            
-            
-            expiry_date = self._fao_wapor_last_login_date + datetime.timedelta(seconds=self._fao_wapor_expires_in)
-            # if expiry date is still false, something else wrong and return error
-            if expiry_date > datetime.datetime.now() == False:
-                raise ValueError('could not get valid token')
-                
+        sign_in=self.sign_in_url
+        key=APItoken
+        resp_vp=requests.post(sign_in,headers={'X-GISMGR-API-KEY':key})
+        resp_vp = resp_vp.json()
+        self._fao_wapor_token=resp_vp['response']['accessToken']
         return self._fao_wapor_token
+#        """
+#        function to check if current token is still valid
+#        
+#        Parameters
+#        ----------
+#        
+#        """
+#        
+#        if not len(self._fao_wapor_token):
+#            # get token
+#            self._query_token(email, password)
+#            self._query_account_info()
+#            
+#        # expiry time is the last login date + the expiry time in seconds from identity toolkit  
+#        expiry_date = self._fao_wapor_last_login_date + datetime.timedelta(seconds=self._fao_wapor_expires_in)
+#        
+#        # if false, token is expired
+#        if expiry_date > datetime.datetime.now() == False:
+#            # request new token
+#            self._query_token(email,password)
+#            self._query_account_info()            
+#            
+#            expiry_date = self._fao_wapor_last_login_date + datetime.timedelta(seconds=self._fao_wapor_expires_in)
+#            # if expiry date is still false, something else wrong and return error
+#            if expiry_date > datetime.datetime.now() == False:
+#                raise ValueError('could not get valid token')
+#                
+#        return self._fao_wapor_token
     
-        
-    def get_coverage_url(self, email, password, raster_id, cube_code, loc_type, loc_code):
+       
+#    def get_coverage_url(self, email, password, raster_id, cube_code, loc_type=None, loc_code=None):
+    def get_coverage_url(self, APItoken, raster_id, cube_code, loc_type=None, loc_code=None):
         """
         function to retrieve a coverage URL given dataset, date, location, email and password
         make sure you are a registered user at WaPOR (https://wapor.apps.fao.org/sign-in)
@@ -827,7 +860,7 @@ class __fao_wapor_class(object):
                 raster_id,
                 loc_code
             )    
-            rasterId='{4}_{5}'.format(
+            rasterId='{4}'.format(
                 self._fao_wapor_download, 
                 cube_level, 
                 cube_product, 
@@ -837,7 +870,8 @@ class __fao_wapor_class(object):
             )    
         
         # get new token or reuse if still valid
-        token = self._quary_valid_token(email, password)
+#        token = self._quary_valid_token(email, password)
+        token=self._quary_valid_token(APItoken)
         
         params = {'language':language, 'requestType':requestType, 'cubeCode':cubeCode, 'rasterId':rasterId}
         headers = {'Authorization': "Bearer " + token}
