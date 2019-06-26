@@ -33,7 +33,7 @@ Metadata request for available products.
     # get additional info of the dataset given a code and catalogus
     df_add = hkv.read_wapor.get_additional_info(df, cube_code='L2_AET_D')
      
-A Jupyter Notebook is available in the `notebook` folder with a detailed [example](../master/notebook/example%20usage%20hkvwaporpy.ipynb "example usage notebook.ipynb") how to retrieve the url and parse and read this raster using GDAL.
+A Jupyter Notebook is available in the `notebook` folder with a detailed [example](https://nbviewer.jupyter.org/github/HKV-products-services/hkvwaporpy/blob/master/notebook/example%20usage%20hkvwaporpy.ipynb "example usage notebook.ipynb") how to retrieve the url and parse and read this raster using GDAL.
 
 # Credits
 HKVWAPORPY is written by
