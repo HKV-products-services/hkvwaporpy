@@ -868,6 +868,10 @@ class __fao_wapor_class(object):
                 raster_id,
                 loc_code
             )    
+        # Get cube_code and raster id for L3 products
+        if cube_level == 'L3':
+            cubeCode= cube_code
+            rasterId= raster_id
         
         # get new token or reuse if still valid
 #        token = self._quary_valid_token(email, password)
