@@ -13,16 +13,16 @@ class __fao_wapor_class(object):
         # 'http://www.fao.org/wapor-download/WAPOR/coverages/mosaic'        
         
         # new:
-        self._fao_sdi_data_discovery = 'https://io.apps.fao.org/gismgr/api/v1/catalog/workspaces/WAPOR/cubes'
+        self._fao_sdi_data_discovery = 'https://io.apps.fao.org/gismgr/api/v1/catalog/workspaces/{0}/cubes'
         self._fao_sdi_data_query = 'https://io.apps.fao.org/gismgr/api/v1/query'#'https://api.fao.org/api/sdi/data/query'
-        self._fao_wapor_download = 'https://io.apps.fao.org/gismgr/api/v1/download/WAPOR'
+        self._fao_wapor_download = 'https://io.apps.fao.org/gismgr/api/v1/download/{0}'
         self._fao_wapor_identitytoolkit_url = 'https://www.googleapis.com/identitytoolkit/v3/relyingparty'
         self._fao_wapor_identitytoolkit_key = 'AIzaSyAgnCXnRLfniGG6iMqv8PFSpop41YoOrr4'
         self._fao_wapor_token = ''
         self.sign_in_url='https://io.apps.fao.org/gismgr/api/v1/iam/sign-in'
-        
-    
-    def _query_catalogus(self, overview=False,paged=False):
+        self.workspace_code = {'1.1': 'WAPOR', '2.0': 'WAPOR_2'}
+        self.version='1.1'
+    def _query_catalogus(self, version,overview=False,paged=False):
         """
         Retrieve catalogus of all available datasets on WaPOR
 
@@ -40,7 +40,10 @@ class __fao_wapor_class(object):
         """
         # create url
 #        meta_data_url = '{0}?overview={1}'.format(self._fao_sdi_data_discovery, overview)
-        meta_data_url = '{0}?overview={1}&paged={2}'.format(self._fao_sdi_data_discovery, overview,paged)
+        #Get workspace url according to version code
+        data_discovery_url=self._fao_sdi_data_discovery.format(self.workspace_code[version])
+        
+        meta_data_url = '{0}?overview={1}&paged={2}'.format(data_discovery_url, overview,paged)
         #print(meta_data_url)
 
         # get request
@@ -53,8 +56,9 @@ class __fao_wapor_class(object):
         self._catalogus = df
         return df            
     
-    def get_catalogus(self):
-        self._catalogus = self._query_catalogus()
+    def get_catalogus(self,version='1.1'):
+        self._catalogus = self._query_catalogus(version)
+        self.version=version
         return self._catalogus
     
     def get_info_cube(self, cube_code='L2_AETI_D'):
@@ -71,16 +75,16 @@ class __fao_wapor_class(object):
         df_cube_info : pd.DataFrame
             dataframe containing detailed information of the dataset
         """
-        
+        version=self.version
         # firstly retrieve information from catalogus
-        df_add_info = self._query_additional_info(cube_code=cube_code)
+        df_add_info = self._query_additional_info(cube_code)
         
         # secondly retrieve information from cube dimensions
         # df_season, list_season_values, 
-        df_dimensions = self._query_dimensions(cube_code=cube_code)
+        df_dimensions = self._query_dimensions(cube_code,version)
         
         # thirldy retrieve information from cube measures
-        df_measures = self._query_measures(cube_code=cube_code)
+        df_measures = self._query_measures(cube_code,version)
         
         # fourthly combine the dataframes
         df_add_info.loc['dimensions', cube_code] = pd.np.nan
@@ -120,7 +124,7 @@ class __fao_wapor_class(object):
         
         return df_add_info      
     
-    def _query_measures(self, cube_code, overview=False):
+    def _query_measures(self, cube_code, version, overview=False):
         """
         get information regarding the units and measurement
 
@@ -135,7 +139,11 @@ class __fao_wapor_class(object):
             dataframe containing measures information of the dataset
         """
         # create url
-        measures_data_url = '{0}/{1}/measures?overview={2}'.format(self._fao_sdi_data_discovery, cube_code, overview)
+        
+        #Get workspace url according to version code
+        data_discovery_url=self._fao_sdi_data_discovery.format(self.workspace_code[version])
+      
+        measures_data_url = '{0}/{1}/measures?overview={2}'.format(data_discovery_url, cube_code, overview)
 
         # get request
         resp = requests.get(measures_data_url)
@@ -154,7 +162,7 @@ class __fao_wapor_class(object):
         
         return df_measures
 
-    def _query_dimensions(self, cube_code, overview=False):
+    def _query_dimensions(self, cube_code, version, overview=False):
         """
         get (time) dimension info from dataset
 
@@ -169,7 +177,10 @@ class __fao_wapor_class(object):
             dataframe containing time dimension information of the dataset
         """
         # create url
-        dimensions_data_url = '{0}/{1}/dimensions?overview={2}'.format(self._fao_sdi_data_discovery, cube_code, overview)
+        #Get workspace url according to version code
+        data_discovery_url=self._fao_sdi_data_discovery.format(self.workspace_code[version])
+      
+        dimensions_data_url = '{0}/{1}/dimensions?overview={2}'.format(data_discovery_url, cube_code, overview)
 
         # get request
         resp = requests.get(dimensions_data_url)
@@ -217,7 +228,7 @@ class __fao_wapor_class(object):
         #df_dimensions.rename(columns={0: cube_code}, inplace=True)        
         return df_dimensions
     
-    def _query_dimension_members(self, cube_code, dimension, overview=False, paged=False, sort='code'):
+    def _query_dimension_members(self, cube_code, dimension, version, overview=False, paged=False, sort='code'):
         """
         get dimension members from dataset
 
@@ -234,8 +245,11 @@ class __fao_wapor_class(object):
             dataframe containing dimension members
         """
         # create url
+        #Get workspace url according to version code
+        data_discovery_url=self._fao_sdi_data_discovery.format(self.workspace_code[version])
+      
         members_data_url = '{0}/{1}/dimensions/{2}/members?overview={3}&paged={4}&sort={5}'.format(
-            self._fao_sdi_data_discovery, cube_code, dimension, overview, paged, sort)
+            data_discovery_url, cube_code, dimension, overview, paged, sort)
 
         # get request
         resp = requests.get(members_data_url)
@@ -615,7 +629,7 @@ class __fao_wapor_class(object):
     
 
     # get locations of data availability
-    def get_locations(self, filter_value=None, workspace_code='WAPOR'):
+    def get_locations(self, filter_value=None):
         """
         Function to get locations of countries or basins of specific workspace
 
@@ -630,7 +644,8 @@ class __fao_wapor_class(object):
         df : pd.DataFrame
             dataframe containing name, code, type and bbox of all known locations
         """
-
+        version= self.version
+        workspace_code=self.workspace_code[version]
         # initate empty lists to fill
         loc_name = []
         loc_code = []
@@ -805,7 +820,7 @@ class __fao_wapor_class(object):
             choose from 'BASIN' or 'COUNTRY'
         loc_code : str
             code corresponding to location (get from read_wapor.get_locations())
-
+      
         Returns
         -------
         coverage_object : dict
@@ -828,11 +843,17 @@ class __fao_wapor_class(object):
         # generic params for raster data
         language = 'en'
         requestType = 'mapset_raster'
+        
+        #download url according to version
+        version= self.version
+        wapor_download_url=self._fao_wapor_download.format(self.workspace_code[version])
             
         # get cube_code and raster_id for L2 products
         if cube_level == 'L2':
+            if (loc_type==None) or (loc_code==None):
+                print('For Level 2: Specify loc_type and loc_code')
             cubeCode = '{1}_{2}_{3}_{4}'.format(
-                self._fao_wapor_download, 
+                wapor_download_url, 
                 cube_level, 
                 cube_product, 
                 loc_type, 
@@ -841,7 +862,7 @@ class __fao_wapor_class(object):
                 loc_code
             )
             rasterId = '{5}_{6}'.format(
-                self._fao_wapor_download, 
+                wapor_download_url, 
                 cube_level, 
                 cube_product, 
                 loc_type, 
@@ -853,7 +874,7 @@ class __fao_wapor_class(object):
         # get cube_code and raster_id for L1 products
         if cube_level == 'L1':
             cubeCode= '{1}_{2}_{3}'.format(
-                self._fao_wapor_download, 
+                wapor_download_url, 
                 cube_level, 
                 cube_product, 
                 cube_dimension,
@@ -861,13 +882,17 @@ class __fao_wapor_class(object):
                 loc_code
             )    
             rasterId='{4}'.format(
-                self._fao_wapor_download, 
+                wapor_download_url, 
                 cube_level, 
                 cube_product, 
                 cube_dimension,
                 raster_id,
                 loc_code
             )    
+        # Get cube_code and raster id for L3 products
+        if cube_level == 'L3':
+            cubeCode= cube_code
+            rasterId= raster_id
         
         # get new token or reuse if still valid
 #        token = self._quary_valid_token(email, password)
@@ -875,7 +900,7 @@ class __fao_wapor_class(object):
         
         params = {'language':language, 'requestType':requestType, 'cubeCode':cubeCode, 'rasterId':rasterId}
         headers = {'Authorization': "Bearer " + token}
-        cov_base_url = self._fao_wapor_download
+        cov_base_url = wapor_download_url
         r = requests.get(cov_base_url, params=params, headers=headers)
         resp = r.json()['response']
         
