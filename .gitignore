@@ -99,3 +99,10 @@ ENV/
 
 # mypy
 .mypy_cache/
+Untitled*.ipynb
+.mypy*
+.pytest_cache
+*.DS_Store
+
+# VSCode
+.vscode
