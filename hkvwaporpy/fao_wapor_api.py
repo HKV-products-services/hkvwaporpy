@@ -441,6 +441,7 @@ class __fao_wapor_class(object):
         end_dekad_list = []
         year_list = []
         day_list = []
+        month_list= []
         season_list = []
         stage_list = []
         
@@ -488,6 +489,12 @@ class __fao_wapor_class(object):
                     # append to list
                     
                     day_list.append(day)
+                elif period == 'MONTH':
+                    year = int(date_value[0:4])
+                    month = int(date_value[5:7])
+                    month = datetime.datetime(year=year, month=month, day=1)
+                    month_list.append(month)
+                    
                     
         elif dimensions == 2:
             for item in resp['response']['items']:    
@@ -530,6 +537,12 @@ class __fao_wapor_class(object):
                               columns=['year', 'raster_id', 'bbox_srid', 'bbox_value'])
             df.loc[:,'year'] = df['year'].dt.strftime('%Y')
             df.set_index('year', inplace=True)
+            
+        elif month_list:
+            df = pd.DataFrame(list(zip(month_list, raster_id_list, bbox_srid_list, bbox_value_list)),
+                              columns=['month', 'raster_id', 'bbox_srid', 'bbox_value'])
+            df.loc[:,'year'] = df['month'].dt.strftime('%Y')
+            df.set_index('month', inplace=True)
             
         elif day_list:
             df = pd.DataFrame(list(zip(day_list, raster_id_list, bbox_srid_list, bbox_value_list)),
@@ -852,25 +865,37 @@ class __fao_wapor_class(object):
         if cube_level == 'L2':
             if (loc_type==None) or (loc_code==None):
                 print('For Level 2: Specify loc_type and loc_code')
-            cubeCode = '{1}_{2}_{3}_{4}'.format(
-                wapor_download_url, 
-                cube_level, 
-                cube_product, 
-                loc_type, 
-                cube_dimension,
-                raster_id,
-                loc_code
-            )
-            rasterId = '{5}_{6}'.format(
-                wapor_download_url, 
-                cube_level, 
-                cube_product, 
-                loc_type, 
-                cube_dimension,
-                raster_id,
-                loc_code
-            )
-            
+            if version=='1.1':
+                cubeCode = '{1}_{2}_{3}_{4}'.format(
+                    wapor_download_url, 
+                    cube_level, 
+                    cube_product, 
+                    loc_type, 
+                    cube_dimension,
+                    raster_id,
+                    loc_code
+                )
+                rasterId = '{5}_{6}'.format(
+                    wapor_download_url, 
+                    cube_level, 
+                    cube_product, 
+                    loc_type, 
+                    cube_dimension,
+                    raster_id,
+                    loc_code
+                )
+            elif version=='2.0':
+                cubeCode = '{1}_{3}_{2}_{4}'.format(
+                    wapor_download_url, 
+                    cube_level, 
+                    cube_product, 
+                    loc_type, 
+                    cube_dimension,
+                    raster_id,
+                    loc_code
+                )
+                rasterId = raster_id.replace(cube_level,'{0}_{1}'.format(cube_level,loc_code))
+                
         # get cube_code and raster_id for L1 products
         if cube_level == 'L1':
             cubeCode= '{1}_{2}_{3}'.format(
